@@ -22,6 +22,8 @@ import com.alipay.sofa.rpc.dynamic.DynamicConfigKeys;
 import com.alipay.sofa.rpc.dynamic.DynamicConfigManager;
 import com.alipay.sofa.rpc.dynamic.DynamicConfigManagerFactory;
 import com.alipay.sofa.rpc.dynamic.zk.ZookeeperDynamicConfigManager;
+import com.alipay.sofa.rpc.log.Logger;
+import com.alipay.sofa.rpc.log.LoggerFactory;
 import com.alipay.sofa.rpc.test.HelloService;
 import com.alipay.sofa.rpc.test.config.base.BaseZkTest;
 import org.apache.curator.framework.CuratorFramework;
@@ -36,6 +38,8 @@ import java.lang.reflect.Field;
  * @version ZookeeperDynamicConfigTest.java, v 0.1 2024年09月28日 14:33 Narziss
  */
 public class ZookeeperDynamicConfigTest extends BaseZkTest {
+
+    Logger logger = LoggerFactory.getLogger(ZookeeperDynamicConfigTest.class);
 
     @Test
     public void testZookeeperDynamicConfig() throws Exception {
@@ -57,24 +61,36 @@ public class ZookeeperDynamicConfigTest extends BaseZkTest {
         Field field = ZookeeperDynamicConfigManager.class.getDeclaredField("zkClient");
         field.setAccessible(true);
         CuratorFramework zkClient = (CuratorFramework) field.get(dynamicConfigManager);
-        // 创建或更新配置节点
+
+        // 新增或修改配置节点
         if (zkClient.checkExists().forPath("/config/demo/com.alipay.sofa.rpc.test.HelloService") == null) {
             zkClient.create()
                 .creatingParentsIfNeeded()
                 .withMode(CreateMode.PERSISTENT)
                 .forPath("/config/demo/com.alipay.sofa.rpc.test.HelloService", "timeout=5000".getBytes());
         } else {
-            zkClient.setData().forPath("/sofa-rpc/config/demo/com.alipay.sofa.rpc.test.HelloService",
+            zkClient.setData().forPath("/config/demo/com.alipay.sofa.rpc.test.HelloService",
                 "timeout=5000".getBytes());
         }
-
         try {
             Thread.sleep(3000);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
         }
         // 验证配置是否更新
         Assert.assertEquals(5000, consumerConfig.getMethodTimeout("sayHello"));
+
+        //删除配置节点
+        zkClient.delete().forPath("/config/demo/com.alipay.sofa.rpc.test.HelloService");
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            logger.error(e.getMessage(), e);
+        }
+        // 验证配置是否删除
+        Assert.assertEquals(-1, consumerConfig.getMethodTimeout("sayHello"));
+
+        System.clearProperty(DynamicConfigKeys.DYNAMIC_URL.getKey());
 
     }
 }

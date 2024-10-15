@@ -462,29 +462,34 @@ public class DefaultConsumerBootstrap<T> extends ConsumerBootstrap<T> {
 
         @Override
         public void process(ConfigChangedEvent event) {
+            // 清除上次的赋值，并保留赋值过的key
             for (String key : newValueMap.keySet()) {
                 newValueMap.put(key, "");
             }
             if (!event.getChangeType().equals(ConfigChangeType.DELETED)) {
                 // ADDED or MODIFIED
-                String[] lines = event.getContent().split("\n");
-                for (String line : lines) {
-                    String[] keyValue = line.split("=", 2);
-                    if (keyValue.length == 2) {
-                        String key = keyValue[0].trim();
-                        String value = keyValue[1].trim();
-                        for (String dynamicConfigKey : dynamicConfigKeys) {
-                            if (key.equals(dynamicConfigKey) || key.endsWith("." + dynamicConfigKey)) {
-                                newValueMap.put(key, value);
-                                break;
-                            }
-                        }
-                    } else {
-                        LOGGER.warn("Malformed configuration line: {}", line);
-                    }
-                }
+                parseConfigurationLines(event.getContent());
             }
             attrUpdated(newValueMap);
+        }
+
+        private void parseConfigurationLines(String content) {
+            String[] lines = content.split("\n");
+            for (String line : lines) {
+                String[] keyValue = line.split("=", 2);
+                if (keyValue.length == 2) {
+                    String key = keyValue[0].trim();
+                    String value = keyValue[1].trim();
+                    for (String dynamicConfigKey : dynamicConfigKeys) {
+                        if (key.equals(dynamicConfigKey) || key.endsWith("." + dynamicConfigKey)) {
+                            newValueMap.put(key, value);
+                            break;
+                        }
+                    }
+                } else {
+                    LOGGER.warn("Malformed configuration line: {}", line);
+                }
+            }
         }
 
         @Override

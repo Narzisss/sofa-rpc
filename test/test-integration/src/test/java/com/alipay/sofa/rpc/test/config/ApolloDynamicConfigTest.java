@@ -41,7 +41,7 @@ public class ApolloDynamicConfigTest {
 
     @Test
     public void testApolloDynamicConfig() throws Exception {
-        System.setProperty(DynamicConfigKeys.DYNAMIC_URL.getKey(), "apollo://127.0.0.1:8080");
+        System.setProperty(DynamicConfigKeys.DYNAMIC_URL.getKey(), "apollo://127.0.0.1:8080?cluster=default");
         ApplicationConfig clientApplication = new ApplicationConfig();
         clientApplication.setAppName("demo");
 
@@ -64,13 +64,33 @@ public class ApolloDynamicConfigTest {
         ApolloDynamicConfigManager.ApolloListener apolloConfigListener = watchListenerMap.get(consumerConfig
             .getInterfaceId());
 
-        // 测试配置更新
-        String configValue = "timeout=5000\n.sayHello.timeout=6000";
+        // 测试配置新增
+        String configValue = "timeout=5000\n";
         ConfigChange configChange = new ConfigChange("application", consumerConfig.getInterfaceId(), null, configValue, PropertyChangeType.ADDED);
         Map<String, ConfigChange> changes= new HashMap<>();
         changes.put(configChange.getPropertyName(), configChange);
         ConfigChangeEvent event = new ConfigChangeEvent("application",changes);
         apolloConfigListener.onChange(event);
+        Assert.assertEquals(5000, consumerConfig.getMethodTimeout("sayHello"));
+
+        // 测试配置修改
+        String oldValue = configValue;
+        configValue = "timeout=5000\n.sayHello.timeout=6000";
+        configChange = new ConfigChange("application", consumerConfig.getInterfaceId(), oldValue, configValue, PropertyChangeType.MODIFIED);
+        changes= new HashMap<>();
+        changes.put(configChange.getPropertyName(), configChange);
+        event = new ConfigChangeEvent("application",changes);
+        apolloConfigListener.onChange(event);
         Assert.assertEquals(6000, consumerConfig.getMethodTimeout("sayHello"));
+
+        // 测试配置删除
+        configChange = new ConfigChange("application", consumerConfig.getInterfaceId(), configValue, null, PropertyChangeType.DELETED);
+        changes= new HashMap<>();
+        changes.put(configChange.getPropertyName(), configChange);
+        event = new ConfigChangeEvent("application",changes);
+        apolloConfigListener.onChange(event);
+        Assert.assertEquals(-1, consumerConfig.getMethodTimeout("sayHello"));
+
+        System.clearProperty(DynamicConfigKeys.DYNAMIC_URL.getKey());
     }
 }
